@@ -136,9 +136,10 @@ object ImageUtils {
 
     fun processResultDataForBitmap(launcerActivity:Activity, authority:String,doOnExit:((Bitmap)->Unit)?){
         processResultData(launcerActivity, authority)
-        val bitmap = ImageCompressionUtils
-                        .getBitmapImageFromFile(launcerActivity.applicationContext, mPhotoFile)
-        doOnExit?.let { it(bitmap) }
+        ImageCompressionUtils
+            .getBitmapImageFromFile(launcerActivity.applicationContext, mPhotoFile)?.apply {
+                doOnExit?.let { it(this) }
+            }
     }
 
     fun processResultData(launcerActivity:Activity, authority:String){
