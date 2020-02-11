@@ -29,17 +29,35 @@ import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
 import com.squareup.picasso.Transformation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 object ImageUtils {
 
     lateinit var mPhotoFile:File
 
-    fun urlToFile(link: String, fileName: String, context: Context): String? {
+    suspend fun urlToFile(link: String, fileName: String, context: Context): String? {
         try {
-            val bitmap = Picasso.get().load(link).get()
+            val bitmap = suspendCoroutine<Bitmap> {
+                GlobalScope.launch(Dispatchers.IO) {
+                    try {
+                        it.resume(Picasso.get().load(link).get())
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        it.resumeWithException(e)
+                    }
+                }
+            }
+//            val bitmap = Picasso.get().load(link).get()
             val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
             val os = FileOutputStream(imageFile);
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
