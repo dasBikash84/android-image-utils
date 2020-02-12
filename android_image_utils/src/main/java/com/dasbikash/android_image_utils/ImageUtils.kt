@@ -20,6 +20,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.Looper
 import android.os.NetworkOnMainThreadException
 import android.provider.MediaStore
 import android.widget.ImageView
@@ -27,12 +28,12 @@ import androidx.annotation.DrawableRes
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import com.dasbikash.android_image_utils.exceptions.ImageDownloadException
+import com.dasbikash.android_image_utils.exceptions.OnMainThreadException
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
 import com.squareup.picasso.Transformation
 import io.reactivex.Observable
-import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.*
 import java.io.File
@@ -85,22 +86,47 @@ object ImageUtils {
             }
     }
 
-    fun getFileFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File{
+    private fun getFileFromBitmap(bitmap: Bitmap, fileName: String, context: Context,
+                          fileFormat:Bitmap.CompressFormat):File{
+        if (isOnMainThread()){
+            throw OnMainThreadException(null)
+        }
         val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
         val os = FileOutputStream(imageFile)
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
+        bitmap.compress(fileFormat, 100, os)
         os.flush()
         os.close()
         return imageFile
     }
 
-    suspend fun getFileFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File{
+    fun getPngFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File =
+        getFileFromBitmap(bitmap,fileName, context, Bitmap.CompressFormat.PNG)
+
+    fun getJpgFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File =
+        getFileFromBitmap(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
+
+    private suspend fun getFileFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context,
+                                           fileFormat:Bitmap.CompressFormat):File{
         val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
         val os = FileOutputStream(imageFile)
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
+        bitmap.compress(fileFormat, 100, os)
         runSuspended {os.flush()}
         runSuspended {os.close()}
         return imageFile
+    }
+
+    suspend fun getPngFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
+        getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.PNG)
+
+    suspend fun getJpgFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
+        getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
+
+
+    fun getFileFromUrl(url: String,fileName: String, context: Context,
+                       fileFormat:Bitmap.CompressFormat):File {
+        getBitmapFromUrl(url).apply {
+            return getFileFromUrl(url, fileName, context, fileFormat)
+        }
     }
 
     /**
@@ -245,3 +271,4 @@ suspend fun <T:Any> runSuspended(task:()->T):T {
     }
 }
 suspend fun coroutineContext(): CoroutineContext = suspendCoroutine { it.resume(it.context) }
+fun isOnMainThread() = (Thread.currentThread() == Looper.getMainLooper().thread)
