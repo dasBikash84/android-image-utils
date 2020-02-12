@@ -26,6 +26,7 @@ import android.widget.ImageView
 import androidx.annotation.DrawableRes
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
+import com.dasbikash.android_image_utils.exceptions.ImageDownloadException
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
@@ -65,7 +66,13 @@ object ImageUtils {
         }
     }
 
-    fun getBitmapFromUrl(url: String):Bitmap = Picasso.get().load(url).get()
+    fun getBitmapFromUrl(url: String):Bitmap {
+        try {
+            return Picasso.get().load(url).get()
+        }catch (ex:Throwable){
+            throw ImageDownloadException(ex)
+        }
+    }
 
     suspend fun getBitmapFromUrlSuspended(url: String):Bitmap =
         runSuspended { getBitmapFromUrl(url)}
