@@ -20,6 +20,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.NetworkOnMainThreadException
 import android.provider.MediaStore
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
@@ -29,43 +30,91 @@ import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
 import com.squareup.picasso.Transformation
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import io.reactivex.Observable
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 object ImageUtils {
 
     lateinit var mPhotoFile:File
 
-    suspend fun urlToFile(link: String, fileName: String, context: Context): String? {
+    /**
+     * Will download image(if not already downloaded) suspended for given url and save on disk.
+     *
+     * @author Bikash Das
+     * @param url Image url
+     * @param fileName name of file on local disk
+     * @param context android context
+     * @return disk file path for success or null for failure.
+     * */
+    suspend fun fetchImage(url: String, fileName: String, context: Context): String? {
         try {
-            val bitmap = suspendCoroutine<Bitmap> {
-                GlobalScope.launch(Dispatchers.IO) {
-                    try {
-                        it.resume(Picasso.get().load(link).get())
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        it.resumeWithException(e)
-                    }
-                }
-            }
-//            val bitmap = Picasso.get().load(link).get()
-            val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
-            val os = FileOutputStream(imageFile);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
-            os.flush()
-            os.close()
+            val bitmap = runSuspended { getBitmapFromUrl(url) }
+            val imageFile = getFileFromBitmapSuspended(bitmap,fileName, context)
             return imageFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
+            return null
+        }
+    }
+
+    fun getBitmapFromUrl(url: String):Bitmap = Picasso.get().load(url).get()
+
+    suspend fun getBitmapFromUrlSuspended(url: String):Bitmap =
+        runSuspended { getBitmapFromUrl(url)}
+
+    fun getBitmapFromUrlObservable(url: String):Observable<Bitmap> {
+        return Observable.just(true)
+            .subscribeOn(Schedulers.io())
+            .map {
+                getBitmapFromUrl(url)
+            }
+    }
+
+    fun getFileFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File{
+        val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
+        val os = FileOutputStream(imageFile)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
+        os.flush()
+        os.close()
+        return imageFile
+    }
+
+    suspend fun getFileFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File{
+        val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
+        val os = FileOutputStream(imageFile)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, os)
+        runSuspended {os.flush()}
+        runSuspended {os.close()}
+        return imageFile
+    }
+
+    /**
+     * Will download image(if not already downloaded) for given url and save on disk.
+     *
+     * @author Bikash Das
+     * @param url Image url
+     * @param fileName name of file on local disk
+     * @param context android context
+     * @return disk file path for success or null for failure.
+     * */
+    fun getBitmapFromUrl(url: String, fileName: String, context: Context): String? {
+        try {
+            val bitmap = getBitmapFromUrl(url)
+            val imageFile = getFileFromBitmap(bitmap,fileName, context)
+            return imageFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (e is NetworkOnMainThreadException){
+                throw e
+            }
             return null
         }
     }
@@ -89,30 +138,30 @@ object ImageUtils {
             requestCreator = picasso.load(defaultImageResourceId)
         }
         requestCreator
-                .error(defaultImageResourceId)
-                .placeholder(placeHolderImageResourceId)
-                .transform(object : Transformation{
-                    override fun key(): String {
-                        return UUID.randomUUID().toString()
+            .error(defaultImageResourceId)
+            .placeholder(placeHolderImageResourceId)
+            .transform(object : Transformation{
+                override fun key(): String {
+                    return UUID.randomUUID().toString()
+                }
+                override fun transform(source: Bitmap?): Bitmap {
+                    if (showLandscape && (source!!.height>source.width)){
+                        val result =
+                            rotate(source, 270)
+                        source.recycle()
+                        return result
+                    }else {
+                        return source!!
                     }
-                    override fun transform(source: Bitmap?): Bitmap {
-                        if (showLandscape && (source!!.height>source.width)){
-                            val result =
-                                rotate(source, 270)
-                            source.recycle()
-                            return result
-                        }else {
-                            return source!!
-                        }
-                    }
-                })
-                .into(imageView, object : Callback {
-                    override fun onSuccess() {
-                        callBack?.let { callBack() }
-                    }
+                }
+            })
+            .into(imageView, object : Callback {
+                override fun onSuccess() {
+                    callBack?.let { callBack() }
+                }
 
-                    override fun onError(e: java.lang.Exception?) {}
-                })
+                override fun onError(e: java.lang.Exception?) {}
+            })
     }
 
     fun cancelRequestForImageView(imageView: ImageView) {
@@ -180,3 +229,12 @@ object ImageUtils {
         return bm
     }
 }
+
+suspend fun <T:Any> runSuspended(task:()->T):T {
+    coroutineContext().let {
+        return withContext(it) {
+            return@withContext async(Dispatchers.IO) { task() }.await()
+        }
+    }
+}
+suspend fun coroutineContext(): CoroutineContext = suspendCoroutine { it.resume(it.context) }
