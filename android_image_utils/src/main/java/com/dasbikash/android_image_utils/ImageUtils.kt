@@ -59,7 +59,7 @@ object ImageUtils {
     suspend fun fetchImage(url: String, fileName: String, context: Context): String? {
         try {
             val bitmap = runSuspended { getBitmapFromUrl(url) }
-            val imageFile = getFileFromBitmapSuspended(bitmap,fileName, context)
+            val imageFile = getFileFromBitmapSuspended(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
             return imageFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
@@ -141,7 +141,7 @@ object ImageUtils {
     fun getBitmapFromUrl(url: String, fileName: String, context: Context): String? {
         try {
             val bitmap = getBitmapFromUrl(url)
-            val imageFile = getFileFromBitmap(bitmap,fileName, context)
+            val imageFile = getFileFromBitmap(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
             return imageFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
