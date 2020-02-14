@@ -13,28 +13,17 @@
 
 package com.dasbikash.android_image_utils
 
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
-import androidx.core.content.FileProvider
-import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.dasbikash.android_image_utils.exceptions.ImageDownloadException
-import com.squareup.picasso.Callback
-import com.squareup.picasso.Picasso
-import com.squareup.picasso.RequestCreator
-import com.squareup.picasso.Transformation
 import io.reactivex.Observable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.*
@@ -48,10 +37,8 @@ import kotlin.coroutines.suspendCoroutine
 
 object ImageUtils {
 
-    private const val JPG_FILE_EXT = ".jpg"
-    private const val PNG_FILE_EXT = ".png"
-
-    lateinit var mPhotoFile:File
+    internal const val JPG_FILE_EXT = ".jpg"
+    internal const val PNG_FILE_EXT = ".png"
 
     private fun getFileExtension(fileFormat:Bitmap.CompressFormat):String{
         return when{
@@ -202,108 +189,32 @@ object ImageUtils {
         }
     }*/
 
-    fun customLoader(imageView: ImageView, imageFile: File? = null, url: String? = null,
-                     @DrawableRes placeHolderImageResourceId: Int,
-                     @DrawableRes defaultImageResourceId: Int, callBack: (() -> Unit)? = null,
+    fun customLoader(imageView: ImageView, url: String,
+                     lifecycleOwner: LifecycleOwner,
+                     @DrawableRes placeHolderImageResourceId: Int?=null,
+                     @DrawableRes defaultImageResourceId: Int?=null,
+                     callBack: (() -> Unit)? = null,
                      showLandscape:Boolean=false) {
-        val picasso = Picasso.get()
-        val requestCreator: RequestCreator
-
-        if (imageFile != null) {
-            requestCreator = picasso.load(imageFile)
-        } else if(url != null) {
-            if (url.startsWith("/data")) {
-                requestCreator = picasso.load(File(url))
-            } else {
-                requestCreator = picasso.load(url)
+        placeHolderImageResourceId?.let { imageView.setImageResource(it)}
+        getBitmapFromUrlAndProceed(url,lifecycleOwner,
+            doOnSuccess = {
+                if (showLandscape && (it.height>it.width)){
+                    rotate(it, 270)
+                }else {
+                    it
+                }.apply {
+                    imageView.setImageBitmap(this)
+                }
+                callBack?.invoke()
+            },
+            doOnFailure = {
+                it.printStackTrace()
+                defaultImageResourceId?.let { imageView.setImageResource(it)}
             }
-        } else {
-            requestCreator = picasso.load(defaultImageResourceId)
-        }
-        requestCreator
-            .error(defaultImageResourceId)
-            .placeholder(placeHolderImageResourceId)
-            .transform(object : Transformation{
-                override fun key(): String {
-                    return UUID.randomUUID().toString()
-                }
-                override fun transform(source: Bitmap?): Bitmap {
-                    if (showLandscape && (source!!.height>source.width)){
-                        val result =
-                            rotate(source, 270)
-                        source.recycle()
-                        return result
-                    }else {
-                        return source!!
-                    }
-                }
-            })
-            .into(imageView, object : Callback {
-                override fun onSuccess() {
-                    callBack?.let { callBack() }
-                }
-
-                override fun onError(e: java.lang.Exception?) {}
-            })
-    }
-
-    fun cancelRequestForImageView(imageView: ImageView) {
-        Picasso.get().cancelRequest(imageView)
-    }
-
-    fun resetPhotoFile(context: Context){
-        mPhotoFile = File.createTempFile(UUID.randomUUID().toString(), JPG_FILE_EXT,context.filesDir)
-    }
-
-    fun launchCameraForImage(launcherActivity:Activity, requestCode:Int, authority:String, fragment:Fragment?=null){
-        resetPhotoFile(launcherActivity)
-        val captureImage = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        val uri = FileProvider.getUriForFile(
-            launcherActivity,authority, mPhotoFile
-        )
-
-        captureImage.putExtra(MediaStore.EXTRA_OUTPUT, uri)
-        val cameraActivities = launcherActivity.getPackageManager().queryIntentActivities(
-            captureImage, PackageManager.MATCH_DEFAULT_ONLY
-        )
-        for (activity in cameraActivities) {
-            (launcherActivity as ContextWrapper).grantUriPermission(
-                activity.activityInfo.packageName,
-                uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-        }
-        if (fragment!=null) {
-            fragment.startActivityForResult(captureImage, requestCode)
-        }else{
-            launcherActivity.startActivityForResult(captureImage, requestCode)
-        }
-    }
-
-    fun processResultDataForFile(launcerActivity:Activity, authority:String,doOnExit:((File)->Unit)?){
-        processResultData(launcerActivity, authority)
-        doOnExit?.let { it(mPhotoFile) }
-    }
-
-    fun processResultDataForBitmap(launcerActivity:Activity, authority:String,doOnExit:((Bitmap)->Unit)?){
-        processResultData(launcerActivity, authority)
-        ImageCompressionUtils
-            .getBitmapImageFromFile(launcerActivity.applicationContext, mPhotoFile)?.apply {
-                doOnExit?.let { it(this) }
-            }
-    }
-
-    fun processResultData(launcerActivity:Activity, authority:String){
-        val uri = FileProvider.getUriForFile(
-            launcerActivity,authority, mPhotoFile
-        )
-
-        launcerActivity.revokeUriPermission(
-            uri,
-            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         )
     }
 
-    fun rotate(bm: Bitmap, rotation: Int): Bitmap {
+    private fun rotate(bm: Bitmap, rotation: Int): Bitmap {
         if (rotation != 0) {
             val matrix = Matrix()
             matrix.postRotate(rotation.toFloat())
