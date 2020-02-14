@@ -223,10 +223,10 @@ object ImageUtils {
     fun getBitmapFromFile(file: File):Bitmap? = BitmapFactory.decodeFile(file.path)
 
     /**
-     * Sets image File to given Image View.
+     * Sets image File to given ImageView.
      *
      * @param file Subject image file
-     * @param imageView Subject Image View
+     * @param imageView Subject ImageView
      * */
     fun setImageFile(imageView: ImageView,file: File){
         if (file.exists()){
@@ -278,42 +278,4 @@ object ImageUtils {
         }
         return bm
     }
-}
-
-internal suspend fun <T:Any> runSuspended(task:()->T):T {
-    coroutineContext().let {
-        return withContext(it) {
-            return@withContext async(Dispatchers.IO) { task() }.await()
-        }
-    }
-}
-
-internal suspend fun coroutineContext(): CoroutineContext = suspendCoroutine { it.resume(it.context) }
-
-internal fun isOnMainThread() = (Thread.currentThread() == Looper.getMainLooper().thread)
-
-internal fun runOnMainThread(task: () -> Any?,delayMs:Long=0L){
-    Handler(Looper.getMainLooper()).postDelayed( { task() },delayMs)
-}
-
-internal fun LifecycleOwner.runIfNotDestroyed(task:()->Any?){
-    if (this.lifecycle.currentState != Lifecycle.State.DESTROYED){
-        task()
-    }
-}
-
-fun ImageView.setImageFile(file: File){
-    if (file.exists()){
-        this.setImageBitmap(ImageUtils.getBitmapFromFile(file))
-    }
-}
-
-fun ImageView.setImageUrl(url: String,lifecycleOwner: LifecycleOwner,
-                            @DrawableRes placeHolderImageResourceId: Int?=null,
-                            @DrawableRes defaultImageResourceId: Int?=null,
-                            callBack: (() -> Unit)? = null,
-                            showLandscape:Boolean=false){
-    ImageUtils
-        .setImageUrl(
-        this,url,lifecycleOwner,placeHolderImageResourceId,defaultImageResourceId, callBack, showLandscape)
 }
