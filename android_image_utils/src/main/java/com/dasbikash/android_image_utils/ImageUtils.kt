@@ -35,6 +35,11 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
+/**
+ * Helper class for Image related operations on Android devices.
+ *
+ * @author Bikash Das(das.bikash.dev@gmail.com)
+ * */
 object ImageUtils {
 
     internal const val JPG_FILE_EXT = ".jpg"
@@ -48,39 +53,41 @@ object ImageUtils {
     }
 
     /**
-     * Will download image(if not already downloaded) suspended for given url and save on disk.
+     * Will download image asynchronously for given url and inject image as Bitmap to given 'doOnSuccess' function parameter.
+     * 'doOnSuccess' will be called on UI thread only if given 'LifecycleOwner' is not destroyed.
+     * On error 'doOnFailure' will be called on UI thread only if given 'LifecycleOwner' is not destroyed.
      *
-     * @author Bikash Das
-     * @param url Image url
-     * @param fileName name of file on local disk
-     * @param context android context
-     * @return disk file path for success or null for failure.
+     * @param url String Image url
+     * @param lifecycleOwner LifecycleOwner hook, Activity/Fragment based on from where method is called
+     * @param doOnSuccess function to be called on image download success.
+     * @param doOnFailure function to be called on image download failure.
+     * @exception throws ImageDownloadException wrapping cause.
      * */
-    /*suspend fun fetchImage(url: String, fileName: String, context: Context): String? {
-        try {
-            val bitmap = runSuspended { getBitmapFromUrl(url) }
-            val imageFile = getFileFromBitmapSuspended(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
-            return imageFile.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
-    }*/
-
     fun getBitmapFromUrlAndProceed(url: String,lifecycleOwner: LifecycleOwner,
                                     doOnSuccess:(Bitmap)->Any?,doOnFailure:(Throwable)->Any?) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 getBitmapFromUrlSuspended(url).apply {
-                    lifecycleOwner.runIfResumed { runOnMainThread({doOnSuccess(this)}) }
+                    lifecycleOwner.runIfNotDestroyed { runOnMainThread({doOnSuccess(this)}) }
                 }
             }catch (ex:Throwable){
                 ex.printStackTrace()
-                lifecycleOwner.runIfResumed { runOnMainThread({doOnFailure(ex)}) }
+                lifecycleOwner.runIfNotDestroyed { runOnMainThread({doOnFailure(ex)}) }
             }
         }
     }
 
+    /**
+     * Will download image asynchronously for given url and inject image as File to given 'doOnSuccess' function parameter.
+     * 'doOnSuccess' will be called on UI thread only if given 'LifecycleOwner' is not destroyed.
+     * On error 'doOnFailure' will be called on UI thread only if given 'LifecycleOwner' is not destroyed.
+     *
+     * @param url String Image url
+     * @param lifecycleOwner LifecycleOwner hook, Activity/Fragment based on from where method is called
+     * @param doOnSuccess function to be called on image download success.
+     * @param doOnFailure function to be called on image download failure.
+     * @exception throws ImageDownloadException wrapping cause.
+     * */
     fun getFileFromUrlAndProceed(url: String,lifecycleOwner: LifecycleOwner,context: Context,
                                 doOnSuccess:(File)->Any?,doOnFailure:(Throwable)->Any?,
                                 fileName: String? = null) {
@@ -89,18 +96,25 @@ object ImageUtils {
                 getBitmapFromUrlSuspended(url).apply {
                     val nameOnDisk = fileName ?: UUID.randomUUID().toString()
                     getPngFromBitmapSuspended(this, nameOnDisk, context).apply {
-                        lifecycleOwner.runIfResumed {
+                        lifecycleOwner.runIfNotDestroyed {
                             runOnMainThread({doOnSuccess(this)})
                         }
                     }
                 }
             }catch (ex:Throwable){
                 ex.printStackTrace()
-                lifecycleOwner.runIfResumed { runOnMainThread({doOnFailure(ex)}) }
+                lifecycleOwner.runIfNotDestroyed { runOnMainThread({doOnFailure(ex)}) }
             }
         }
     }
 
+    /**
+     * Will download image synchronously for given url.
+     *
+     * @param url String Image url
+     * @exception throws ImageDownloadException wrapping cause.
+     * @return Downloaded image Bitmap
+     * */
     fun getBitmapFromUrl(url: String):Bitmap {
         try {
             return BitmapFactory.decodeStream(URL(url).openStream())
@@ -109,14 +123,30 @@ object ImageUtils {
         }
     }
 
+
+    /**
+     * Will download image being suspended for given url.
+     *
+     * @param url String Image url
+     * @exception throws ImageDownloadException wrapping cause.
+     * @return Downloaded image Bitmap
+     * */
     suspend fun getBitmapFromUrlSuspended(url: String):Bitmap =
         runSuspended { getBitmapFromUrl(url)}
 
+
+    /**
+     * Will return Observable which downloads image upon subscription for given url.
+     *
+     * @param url String Image url
+     * @exception throws ImageDownloadException wrapping cause.
+     * @return Observable for image download
+     * */
     fun getBitmapFromUrlObservable(url: String):Observable<Bitmap> {
-        return Observable.just(true)
+        return Observable.just(url)
             .subscribeOn(Schedulers.io())
             .map {
-                getBitmapFromUrl(url)
+                getBitmapFromUrl(it)
             }
     }
 
@@ -130,10 +160,26 @@ object ImageUtils {
         return imageFile
     }
 
+    /**
+     * Synchronous Bitmap to PNG converter.
+     *
+     * @param bitmap Subject image Bitmap
+     * @param fileName name of return file
+     * @param context Android context
+     * @return PNG image file
+     * */
     fun getPngFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmap(bitmap,fileName, context, Bitmap.CompressFormat.PNG)
 
-    fun getJpgFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File =
+    /**
+     * Synchronous Bitmap to JPEG converter.
+     *
+     * @param bitmap Subject image Bitmap
+     * @param fileName name of return file
+     * @param context Android context
+     * @return JPEG image file
+     * */
+    fun getJpegFromBitmap(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmap(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
 
     private suspend fun getFileFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context,
@@ -146,50 +192,60 @@ object ImageUtils {
         return imageFile
     }
 
+    /**
+     * Suspended Bitmap to PNG converter.
+     *
+     * @param bitmap Subject image Bitmap
+     * @param fileName name of return file
+     * @param context Android context
+     * @return PNG image file
+     * */
     suspend fun getPngFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.PNG)
 
+    /**
+     * Suspended Bitmap to JPEG converter.
+     *
+     * @param bitmap Subject image Bitmap
+     * @param fileName name of return file
+     * @param context Android context
+     * @return JPEG image file
+     * */
     suspend fun getJpgFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
 
+    /**
+     * File to Bitmap converter.
+     *
+     * @param File Subject image file
+     * @return Image file if exists else null.
+     * */
     fun getBitmapFromFile(file: File):Bitmap? = BitmapFactory.decodeFile(file.path)
 
+    /**
+     * Sets image File to given Image View.
+     *
+     * @param file Subject image file
+     * @param imageView Subject Image View
+     * */
     fun setImageFile(imageView: ImageView,file: File){
         if (file.exists()){
             imageView.setImageBitmap(getBitmapFromFile(file))
         }
     }
 
-    fun setImageUrl(imageView: ImageView,url: String, lifecycleOwner: LifecycleOwner){
-        getBitmapFromUrlAndProceed(
-            url,lifecycleOwner,{imageView.setImageBitmap(it)},{it.printStackTrace()}
-        )
-    }
-
     /**
-     * Will download image(if not already downloaded) for given url and save on disk.
+     * Will download image asynchronously for given url and display on given ImageView.
      *
-     * @author Bikash Das
-     * @param url Image url
-     * @param fileName name of file on local disk
-     * @param context android context
-     * @return disk file path for success or null for failure.
+     * @param imageView Subject Image View
+     * @param url String Image url
+     * @param lifecycleOwner LifecycleOwner hook, Activity/Fragment based on from where method is called
+     * @param placeHolderImageResourceId Place-holder image resource ID
+     * @param defaultImageResourceId Image resource Id which will be loaded in case of download error
+     * @param callBack optional callback which will be called on download success
+     * @param showLandscape flag to force land-scape display
      * */
-    /*fun getBitmapFromUrl(url: String, fileName: String, context: Context): String? {
-        try {
-            val bitmap = getBitmapFromUrl(url)
-            val imageFile = getFileFromBitmap(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
-            return imageFile.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            if (e is NetworkOnMainThreadException){
-                throw e
-            }
-            return null
-        }
-    }*/
-
-    fun customLoader(imageView: ImageView, url: String,
+    fun setImageUrl(imageView: ImageView, url: String,
                      lifecycleOwner: LifecycleOwner,
                      @DrawableRes placeHolderImageResourceId: Int?=null,
                      @DrawableRes defaultImageResourceId: Int?=null,
@@ -240,7 +296,7 @@ internal fun runOnMainThread(task: () -> Any?,delayMs:Long=0L){
     Handler(Looper.getMainLooper()).postDelayed( { task() },delayMs)
 }
 
-internal fun LifecycleOwner.runIfResumed(task:()->Any?){
+internal fun LifecycleOwner.runIfNotDestroyed(task:()->Any?){
     if (this.lifecycle.currentState != Lifecycle.State.DESTROYED){
         task()
     }
@@ -252,8 +308,12 @@ fun ImageView.setImageFile(file: File){
     }
 }
 
-fun ImageView.setImageUrl(url: String, lifecycleOwner: LifecycleOwner){
-    ImageUtils.getBitmapFromUrlAndProceed(
-        url,lifecycleOwner,{this.setImageBitmap(it)},{it.printStackTrace()}
-    )
+fun ImageView.setImageUrl(url: String,lifecycleOwner: LifecycleOwner,
+                            @DrawableRes placeHolderImageResourceId: Int?=null,
+                            @DrawableRes defaultImageResourceId: Int?=null,
+                            callBack: (() -> Unit)? = null,
+                            showLandscape:Boolean=false){
+    ImageUtils
+        .setImageUrl(
+        this,url,lifecycleOwner,placeHolderImageResourceId,defaultImageResourceId, callBack, showLandscape)
 }
