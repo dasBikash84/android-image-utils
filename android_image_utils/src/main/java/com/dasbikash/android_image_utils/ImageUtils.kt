@@ -80,7 +80,7 @@ object ImageUtils {
         }
     }*/
 
-    fun getBitmapFromUrlAndProceed(url: URL,lifecycleOwner: LifecycleOwner,
+    fun getBitmapFromUrlAndProceed(url: String,lifecycleOwner: LifecycleOwner,
                                     doOnSuccess:(Bitmap)->Any?,doOnFailure:(Throwable)->Any?) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
@@ -94,7 +94,7 @@ object ImageUtils {
         }
     }
 
-    fun getFileFromUrlAndProceed(url: URL,lifecycleOwner: LifecycleOwner,context: Context,
+    fun getFileFromUrlAndProceed(url: String,lifecycleOwner: LifecycleOwner,context: Context,
                                 doOnSuccess:(File)->Any?,doOnFailure:(Throwable)->Any?,
                                 fileName: String? = null) {
         GlobalScope.launch(Dispatchers.IO) {
@@ -114,22 +114,18 @@ object ImageUtils {
         }
     }
 
-    private fun getBitmapFromUrl(url: String):Bitmap {
-        return Picasso.get().load(url).get()
-    }
-
-    fun getBitmapFromUrl(url: URL):Bitmap {
+    fun getBitmapFromUrl(url: String):Bitmap {
         try {
-            return getBitmapFromUrl(url.toString())
+            return BitmapFactory.decodeStream(URL(url).openStream())
         }catch (ex:Throwable){
             throw ImageDownloadException(ex)
         }
     }
 
-    suspend fun getBitmapFromUrlSuspended(url: URL):Bitmap =
+    suspend fun getBitmapFromUrlSuspended(url: String):Bitmap =
         runSuspended { getBitmapFromUrl(url)}
 
-    fun getBitmapFromUrlObservable(url: URL):Observable<Bitmap> {
+    fun getBitmapFromUrlObservable(url: String):Observable<Bitmap> {
         return Observable.just(true)
             .subscribeOn(Schedulers.io())
             .map {
@@ -169,7 +165,6 @@ object ImageUtils {
     suspend fun getJpgFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
 
-    fun getBitmapFromFile(filePath: String):Bitmap? = BitmapFactory.decodeFile(filePath)
     fun getBitmapFromFile(file: File):Bitmap? = BitmapFactory.decodeFile(file.path)
 
     fun setImageFile(imageView: ImageView,file: File){
@@ -178,7 +173,7 @@ object ImageUtils {
         }
     }
 
-    fun setImageUrl(imageView: ImageView,url: URL, lifecycleOwner: LifecycleOwner){
+    fun setImageUrl(imageView: ImageView,url: String, lifecycleOwner: LifecycleOwner){
         getBitmapFromUrlAndProceed(
             url,lifecycleOwner,{imageView.setImageBitmap(it)},{it.printStackTrace()}
         )
@@ -346,7 +341,7 @@ fun ImageView.setImageFile(file: File){
     }
 }
 
-fun ImageView.setImageUrl(url: URL, lifecycleOwner: LifecycleOwner){
+fun ImageView.setImageUrl(url: String, lifecycleOwner: LifecycleOwner){
     ImageUtils.getBitmapFromUrlAndProceed(
         url,lifecycleOwner,{this.setImageBitmap(it)},{it.printStackTrace()}
     )
