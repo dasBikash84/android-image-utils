@@ -19,16 +19,18 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.os.Handler
 import android.os.Looper
-import android.os.NetworkOnMainThreadException
 import android.provider.MediaStore
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import com.dasbikash.android_image_utils.exceptions.ImageDownloadException
-import com.dasbikash.android_image_utils.exceptions.OnMainThreadException
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
@@ -38,6 +40,7 @@ import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
@@ -45,7 +48,17 @@ import kotlin.coroutines.suspendCoroutine
 
 object ImageUtils {
 
+    private const val JPG_FILE_EXT = ".jpg"
+    private const val PNG_FILE_EXT = ".png"
+
     lateinit var mPhotoFile:File
+
+    private fun getFileExtension(fileFormat:Bitmap.CompressFormat):String{
+        return when{
+            fileFormat == Bitmap.CompressFormat.JPEG -> JPG_FILE_EXT
+            else -> PNG_FILE_EXT
+        }
+    }
 
     /**
      * Will download image(if not already downloaded) suspended for given url and save on disk.
@@ -56,7 +69,7 @@ object ImageUtils {
      * @param context android context
      * @return disk file path for success or null for failure.
      * */
-    suspend fun fetchImage(url: String, fileName: String, context: Context): String? {
+    /*suspend fun fetchImage(url: String, fileName: String, context: Context): String? {
         try {
             val bitmap = runSuspended { getBitmapFromUrl(url) }
             val imageFile = getFileFromBitmapSuspended(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
@@ -65,20 +78,58 @@ object ImageUtils {
             e.printStackTrace()
             return null
         }
+    }*/
+
+    fun getBitmapFromUrlAndProceed(url: URL,lifecycleOwner: LifecycleOwner,
+                                    doOnSuccess:(Bitmap)->Any?,doOnFailure:(Throwable)->Any?) {
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                getBitmapFromUrlSuspended(url).apply {
+                    lifecycleOwner.runIfResumed { runOnMainThread({doOnSuccess(this)}) }
+                }
+            }catch (ex:Throwable){
+                ex.printStackTrace()
+                lifecycleOwner.runIfResumed { runOnMainThread({doOnFailure(ex)}) }
+            }
+        }
     }
 
-    fun getBitmapFromUrl(url: String):Bitmap {
+    fun getFileFromUrlAndProceed(url: URL,lifecycleOwner: LifecycleOwner,context: Context,
+                                doOnSuccess:(File)->Any?,doOnFailure:(Throwable)->Any?,
+                                fileName: String? = null) {
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                getBitmapFromUrlSuspended(url).apply {
+                    val nameOnDisk = fileName ?: UUID.randomUUID().toString()
+                    getPngFromBitmapSuspended(this, nameOnDisk, context).apply {
+                        lifecycleOwner.runIfResumed {
+                            runOnMainThread({doOnSuccess(this)})
+                        }
+                    }
+                }
+            }catch (ex:Throwable){
+                ex.printStackTrace()
+                lifecycleOwner.runIfResumed { runOnMainThread({doOnFailure(ex)}) }
+            }
+        }
+    }
+
+    private fun getBitmapFromUrl(url: String):Bitmap {
+        return Picasso.get().load(url).get()
+    }
+
+    fun getBitmapFromUrl(url: URL):Bitmap {
         try {
-            return Picasso.get().load(url).get()
+            return getBitmapFromUrl(url.toString())
         }catch (ex:Throwable){
             throw ImageDownloadException(ex)
         }
     }
 
-    suspend fun getBitmapFromUrlSuspended(url: String):Bitmap =
+    suspend fun getBitmapFromUrlSuspended(url: URL):Bitmap =
         runSuspended { getBitmapFromUrl(url)}
 
-    fun getBitmapFromUrlObservable(url: String):Observable<Bitmap> {
+    fun getBitmapFromUrlObservable(url: URL):Observable<Bitmap> {
         return Observable.just(true)
             .subscribeOn(Schedulers.io())
             .map {
@@ -88,10 +139,7 @@ object ImageUtils {
 
     private fun getFileFromBitmap(bitmap: Bitmap, fileName: String, context: Context,
                           fileFormat:Bitmap.CompressFormat):File{
-        if (isOnMainThread()){
-            throw OnMainThreadException(null)
-        }
-        val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
+        val imageFile = File(context.filesDir.absolutePath + fileName + getFileExtension(fileFormat))
         val os = FileOutputStream(imageFile)
         bitmap.compress(fileFormat, 100, os)
         os.flush()
@@ -107,7 +155,7 @@ object ImageUtils {
 
     private suspend fun getFileFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context,
                                            fileFormat:Bitmap.CompressFormat):File{
-        val imageFile = File(context.filesDir.absolutePath + fileName + ".jpg")
+        val imageFile = File(context.filesDir.absolutePath + fileName + getFileExtension(fileFormat))
         val os = FileOutputStream(imageFile)
         bitmap.compress(fileFormat, 100, os)
         runSuspended {os.flush()}
@@ -121,12 +169,19 @@ object ImageUtils {
     suspend fun getJpgFromBitmapSuspended(bitmap: Bitmap, fileName: String, context: Context):File =
         getFileFromBitmapSuspended(bitmap,fileName, context, Bitmap.CompressFormat.JPEG)
 
+    fun getBitmapFromFile(filePath: String):Bitmap? = BitmapFactory.decodeFile(filePath)
+    fun getBitmapFromFile(file: File):Bitmap? = BitmapFactory.decodeFile(file.path)
 
-    fun getFileFromUrl(url: String,fileName: String, context: Context,
-                       fileFormat:Bitmap.CompressFormat):File {
-        getBitmapFromUrl(url).apply {
-            return getFileFromUrl(url, fileName, context, fileFormat)
+    fun setImageFile(imageView: ImageView,file: File){
+        if (file.exists()){
+            imageView.setImageBitmap(getBitmapFromFile(file))
         }
+    }
+
+    fun setImageUrl(imageView: ImageView,url: URL, lifecycleOwner: LifecycleOwner){
+        getBitmapFromUrlAndProceed(
+            url,lifecycleOwner,{imageView.setImageBitmap(it)},{it.printStackTrace()}
+        )
     }
 
     /**
@@ -138,7 +193,7 @@ object ImageUtils {
      * @param context android context
      * @return disk file path for success or null for failure.
      * */
-    fun getBitmapFromUrl(url: String, fileName: String, context: Context): String? {
+    /*fun getBitmapFromUrl(url: String, fileName: String, context: Context): String? {
         try {
             val bitmap = getBitmapFromUrl(url)
             val imageFile = getFileFromBitmap(bitmap,fileName, context,Bitmap.CompressFormat.PNG)
@@ -150,7 +205,7 @@ object ImageUtils {
             }
             return null
         }
-    }
+    }*/
 
     fun customLoader(imageView: ImageView, imageFile: File? = null, url: String? = null,
                      @DrawableRes placeHolderImageResourceId: Int,
@@ -202,7 +257,7 @@ object ImageUtils {
     }
 
     fun resetPhotoFile(context: Context){
-        mPhotoFile = File.createTempFile(UUID.randomUUID().toString(),".jpg",context.filesDir)
+        mPhotoFile = File.createTempFile(UUID.randomUUID().toString(), JPG_FILE_EXT,context.filesDir)
     }
 
     fun launchCameraForImage(launcherActivity:Activity, requestCode:Int, authority:String, fragment:Fragment?=null){
@@ -263,12 +318,36 @@ object ImageUtils {
     }
 }
 
-suspend fun <T:Any> runSuspended(task:()->T):T {
+internal suspend fun <T:Any> runSuspended(task:()->T):T {
     coroutineContext().let {
         return withContext(it) {
             return@withContext async(Dispatchers.IO) { task() }.await()
         }
     }
 }
-suspend fun coroutineContext(): CoroutineContext = suspendCoroutine { it.resume(it.context) }
-fun isOnMainThread() = (Thread.currentThread() == Looper.getMainLooper().thread)
+
+internal suspend fun coroutineContext(): CoroutineContext = suspendCoroutine { it.resume(it.context) }
+
+internal fun isOnMainThread() = (Thread.currentThread() == Looper.getMainLooper().thread)
+
+internal fun runOnMainThread(task: () -> Any?,delayMs:Long=0L){
+    Handler(Looper.getMainLooper()).postDelayed( { task() },delayMs)
+}
+
+internal fun LifecycleOwner.runIfResumed(task:()->Any?){
+    if (this.lifecycle.currentState != Lifecycle.State.DESTROYED){
+        task()
+    }
+}
+
+fun ImageView.setImageFile(file: File){
+    if (file.exists()){
+        this.setImageBitmap(ImageUtils.getBitmapFromFile(file))
+    }
+}
+
+fun ImageView.setImageUrl(url: URL, lifecycleOwner: LifecycleOwner){
+    ImageUtils.getBitmapFromUrlAndProceed(
+        url,lifecycleOwner,{this.setImageBitmap(it)},{it.printStackTrace()}
+    )
+}

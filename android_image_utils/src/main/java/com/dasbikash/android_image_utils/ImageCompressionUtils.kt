@@ -26,7 +26,7 @@ import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileNotFoundException
 
-object ImageCompressionUtils {
+internal object ImageCompressionUtils {
 
     private const val DEFAULT_MIN_WIDTH_QUALITY = 200 // min pixels
     private const val TAG = "ImageCompressionUtils"
