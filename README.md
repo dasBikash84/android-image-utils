@@ -24,15 +24,15 @@ dependencies {
 ```
 
 ## Features
-- Image capture using camera api made very simple (`don't need User permission`).
-- Remote image downloading and display made very simple.
+- Image [`capture`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/CameraUtils.kt) using camera api made very simple (`don't need User permission`).
+- Remote [`image downloading and display`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/ImageUtils.kt) made very simple.
 - Provides both synchronous(`blocking`) and asynchronous (`Coroutine suspend`/`Rx-java Observable`) options for image downloading.
-- And utility methods for general image related operations.
+- And [`utility methods`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/Extensions.kt) for general image related operations.
 
 License
 --------
 
-    Copyright 2020 Bikash Das
+    Copyright 2020 Bikash Das(das.bikash.dev@gmail.com)
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
