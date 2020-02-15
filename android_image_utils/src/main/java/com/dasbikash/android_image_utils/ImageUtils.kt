@@ -17,11 +17,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.os.Handler
-import android.os.Looper
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.dasbikash.android_image_utils.exceptions.ImageDownloadException
 import io.reactivex.Observable
@@ -31,9 +28,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 import java.util.*
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 /**
  * Helper class for Image related operations on Android devices.
@@ -277,5 +271,20 @@ object ImageUtils {
             return Bitmap.createBitmap(bm, 0, 0, bm.width, bm.height, matrix, true)
         }
         return bm
+    }
+
+    /**
+     * Will save Bitmap asynchronously on private app storage.
+     *
+     * @param bitmap Subject image Bitmap
+     * @param fileName name of return file
+     * @param context Android context
+     * @param fileFormat Bitmap.CompressFormat, default Bitmap.CompressFormat.PNG
+     * */
+    fun saveBitmap(context: Context, bitmap: Bitmap, fileName:String,
+                   fileFormat: Bitmap.CompressFormat=Bitmap.CompressFormat.PNG){
+        GlobalScope.launch(Dispatchers.IO) {
+            getFileFromBitmapSuspended(bitmap,fileName,context,fileFormat)
+        }
     }
 }
