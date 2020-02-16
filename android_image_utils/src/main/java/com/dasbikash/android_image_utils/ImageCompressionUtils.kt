@@ -102,7 +102,7 @@ internal object ImageCompressionUtils {
         context: Context,
         selectedImage: Uri?
     ): Bitmap? {
-        var bm: Bitmap? = null
+        var bm: Bitmap?
         val sampleSizes = intArrayOf(11, 9, 7, 5, 3, 2, 1)
         var i = 0
         do {
@@ -177,7 +177,7 @@ internal object ImageCompressionUtils {
     private fun getTempFile(context: Context): File {
         val imageFile =
             File(context.externalCacheDir, TEMP_IMAGE_NAME)
-        imageFile.parentFile.mkdirs()
+        imageFile.parentFile?.mkdirs()
         return imageFile
     }
 }
