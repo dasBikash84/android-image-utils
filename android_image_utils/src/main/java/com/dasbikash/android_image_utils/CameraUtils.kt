@@ -23,13 +23,16 @@ object CameraUtils {
             ImageUtils.JPG_FILE_EXT,context.filesDir)
     }
 
+    private fun getAuthority(context: Context) =
+        "${context.applicationContext.packageName}.fileprovider"
+
     private fun cameraLaunchPreProcess(
         context: Context,
         authority: String
     ): Intent? {
         resetPhotoFile(context)
         val uri = FileProvider.getUriForFile(
-            context, authority, mPhotoFile
+            context, getAuthority(context), mPhotoFile
         )
         val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
@@ -99,7 +102,7 @@ object CameraUtils {
 
     private fun processResultData(context: Context, authority:String){
         val uri = FileProvider.getUriForFile(
-            context,authority, mPhotoFile
+            context,getAuthority(context), mPhotoFile
         )
 
         context.revokeUriPermission(
