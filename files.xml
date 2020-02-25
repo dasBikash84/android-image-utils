@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Put this file in your app module's res/xml directory -->
+
+<paths>
+    <files-path name="images" path="."/>
+</paths>

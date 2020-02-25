@@ -7,86 +7,122 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.provider.MediaStore
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import java.io.File
 import java.util.*
 
-object CameraUtils {
+/**
+ * Helper class to take photo using camera.
+ *
+ * #### Example code
+ *
+ * ##### To launch camera
+ * ```
+ *  // From activity
+ *  CameraUtils.launchCameraForImage(launcherActivity, requestCode)
+ *  // or From Fragment
+ *  CameraUtils.launchCameraForImage(fragment, requestCode)
+ * ```
+ *
+ * ##### To get photo
+ * ```
+ * // To access provided image from activity/fragment, "onActivityResult" call
+ *  CameraUtils.processResultDataForFile(context: Context, doWithFile)
+ *  //or
+ *  CameraUtils.processResultDataForBitmap(context: Context, doWithBitmap)
+ * ```
+ * */
+class CameraUtils {
 
-    lateinit var mPhotoFile:File
+    companion object {
 
-    private fun resetPhotoFile(context: Context){
-        mPhotoFile = File.createTempFile(
-            UUID.randomUUID().toString(),
-            ImageUtils.JPG_FILE_EXT,context.filesDir)
-    }
+        lateinit var mPhotoFile: File
 
-    private fun getAuthority(context: Context) =
-        "${context.applicationContext.packageName}.fileprovider"
+        private fun resetPhotoFile(context: Context) {
+            mPhotoFile = File.createTempFile(
+                UUID.randomUUID().toString(),
+                ImageUtils.JPG_FILE_EXT, context.filesDir
+            )
+        }
 
-    private fun cameraLaunchPreProcess(
-        context: Context
-    ): Intent? {
-        resetPhotoFile(context)
-        val uri = FileProvider.getUriForFile(
-            context, getAuthority(context), mPhotoFile
-        )
-        val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
-        val cameraActivities = context.getPackageManager().queryIntentActivities(
-            captureIntent, PackageManager.MATCH_DEFAULT_ONLY
-        )
-        if (cameraActivities.isNotEmpty()){
-            for (activity in cameraActivities) {
-                (context as ContextWrapper).grantUriPermission(
-                    activity.activityInfo.packageName,
-                    uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+        private fun getAuthority(context: Context) =
+            "${context.applicationContext.packageName}.fileprovider"
+
+        private fun cameraLaunchPreProcess(
+            context: Context
+        ): Intent? {
+            resetPhotoFile(context)
+            val uri = FileProvider.getUriForFile(
+                context, getAuthority(context), mPhotoFile
+            )
+            val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            val cameraActivities = context.getPackageManager().queryIntentActivities(
+                captureIntent, PackageManager.MATCH_DEFAULT_ONLY
+            )
+            if (cameraActivities.isNotEmpty()) {
+                for (activity in cameraActivities) {
+                    (context as ContextWrapper).grantUriPermission(
+                        activity.activityInfo.packageName,
+                        uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                }
+                return captureIntent
             }
-            return captureIntent
+            return null
         }
-        return null
-    }
 
-    fun launchCameraForImage(launcherActivity: Activity, requestCode:Int):Boolean{
-        cameraLaunchPreProcess(launcherActivity)?.let {
-            launcherActivity.startActivityForResult(it, requestCode)
-            return true
-        }
-        return false
-    }
-
-    fun launchCameraForImage(fragment: Fragment, requestCode:Int):Boolean{
-        fragment.context?.let {
-            cameraLaunchPreProcess(it)?.let {
-                fragment.startActivityForResult(it, requestCode)
+        @JvmStatic
+        fun launchCameraForImage(launcherActivity: AppCompatActivity, requestCode: Int): Boolean {
+            cameraLaunchPreProcess(launcherActivity)?.let {
+                launcherActivity.startActivityForResult(it, requestCode)
                 return true
             }
+            return false
         }
-        return false
-    }
 
-    fun processResultDataForFile(context: Context, doOnExit:((File)->Unit)?){
-        revokeUriPermission(context)
-        doOnExit?.let { it(mPhotoFile) }
-    }
-
-    fun processResultDataForBitmap(context: Context, doOnExit:((Bitmap)->Unit)?){
-        revokeUriPermission(context)
-        ImageCompressionUtils
-            .getBitmapImageFromFile(context.applicationContext, mPhotoFile)?.apply {
-                doOnExit?.let { it(this) }
+        @JvmStatic
+        fun launchCameraForImage(fragment: Fragment, requestCode: Int): Boolean {
+            fragment.context?.let {
+                cameraLaunchPreProcess(it)?.let {
+                    fragment.startActivityForResult(it, requestCode)
+                    return true
+                }
             }
-    }
+            return false
+        }
 
-    private fun revokeUriPermission(context: Context){
-        val uri = FileProvider.getUriForFile(
-            context,getAuthority(context), mPhotoFile
-        )
-        context.revokeUriPermission(
-            uri,
-            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        )
+        @JvmStatic
+        fun processResultDataForFile(context: Context, doWithFile: ((File) -> Unit)?) {
+            revokeUriPermission(context)
+            doWithFile?.let { it(mPhotoFile) }
+        }
+
+        @JvmStatic
+        fun processResultDataForBitmap(context: Context, doWithBitmap: ((Bitmap) -> Unit)?) {
+            revokeUriPermission(context)
+            ImageCompressionUtils
+                .getBitmapImageFromFile(context.applicationContext, mPhotoFile)?.apply {
+                    doWithBitmap?.let { it(this) }
+                }
+        }
+
+        private fun revokeUriPermission(context: Context) {
+            val uri = FileProvider.getUriForFile(
+                context, getAuthority(context), mPhotoFile
+            )
+            context.revokeUriPermission(
+                uri,
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
     }
 }
+
+fun AppCompatActivity.launchCameraForImage(requestCode: Int): Boolean =
+    CameraUtils.launchCameraForImage(this,requestCode)
+
+fun Fragment.launchCameraForImage(requestCode: Int): Boolean =
+    CameraUtils.launchCameraForImage(this,requestCode)
