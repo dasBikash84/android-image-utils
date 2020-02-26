@@ -31,7 +31,7 @@ dependencies {
 
 ## Usage example
 
-### Capturing Image
+### Image capture using Camera:
 
 ##### Step: 1
 Add provider tag inside your app manifest file as shown below:
@@ -102,6 +102,7 @@ Retrieve captured image:
                 //.............
             }
         }
+    }
     
                                     // Or
         
@@ -120,6 +121,7 @@ Retrieve captured image:
                 //.............
             }
         }
+    }
 ```
 ---
 

@@ -134,10 +134,6 @@ class CameraUtils {
             ImageUtils.getBitmapFromFile(mPhotoFile)?.apply {
                 doWithBitmap?.let { it(this) }
             }
-//            ImageCompressionUtils
-//                .getBitmapImageFromFile(context.applicationContext, mPhotoFile)?.apply {
-//                    doWithBitmap?.let { it(this) }
-//                }
         }
 
         private fun revokeUriPermission(context: Context) {
