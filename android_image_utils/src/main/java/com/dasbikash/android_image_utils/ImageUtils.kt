@@ -23,8 +23,8 @@ import java.util.*
  * */
 object ImageUtils {
 
-    internal const val JPG_FILE_EXT = ".jpg"
-    internal const val PNG_FILE_EXT = ".png"
+    private const val JPG_FILE_EXT = ".jpg"
+    private const val PNG_FILE_EXT = ".png"
 
     private fun getFileExtension(fileFormat:Bitmap.CompressFormat):String{
         return when{
