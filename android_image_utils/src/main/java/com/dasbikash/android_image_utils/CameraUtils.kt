@@ -74,15 +74,29 @@ class CameraUtils {
             return null
         }
 
+        /**
+         * Method to launch Camera from "Activity"
+         *
+         * @param activity Caller Activity/AppCompatActivity
+         * @param requestCode Unique request code that will be injected on "onActivityResult" method of caller Activity/AppCompatActivity
+         * @return "true" on success
+         * */
         @JvmStatic
-        fun launchCameraForImage(launcherActivity: AppCompatActivity, requestCode: Int): Boolean {
-            cameraLaunchPreProcess(launcherActivity)?.let {
-                launcherActivity.startActivityForResult(it, requestCode)
+        fun launchCameraForImage(activity: Activity, requestCode: Int): Boolean {
+            cameraLaunchPreProcess(activity)?.let {
+                activity.startActivityForResult(it, requestCode)
                 return true
             }
             return false
         }
 
+        /**
+         * Method to launch Camera from "Fragment"
+         *
+         * @param fragment Caller Fragment
+         * @param requestCode Unique request code that will be injected on "onActivityResult" method of caller Fragment
+         * @return "true" on success
+         * */
         @JvmStatic
         fun launchCameraForImage(fragment: Fragment, requestCode: Int): Boolean {
             fragment.context?.let {
@@ -94,19 +108,36 @@ class CameraUtils {
             return false
         }
 
+        /**
+         * Method to retrieve image file captured by camera.
+         * Should we called from "onActivityResult" method of caller Activity/Fragment on "Success"         *
+         *
+         * @param context Android Context
+         * @param doWithFile Functional parameter onto which captured image file will be injected
+         * */
         @JvmStatic
-        fun processResultDataForFile(context: Context, doWithFile: ((File) -> Unit)?) {
+        fun handleCapturedImageFile(context: Context, doWithFile: ((File) -> Unit)?) {
             revokeUriPermission(context)
             doWithFile?.let { it(mPhotoFile) }
         }
 
+        /**
+         * Method to retrieve image captured by camera in bitmap format.
+         * Should we called from "onActivityResult" method of caller Activity/Fragment on "Success"         *
+         *
+         * @param context Android Context
+         * @param doWithFile Functional parameter onto which captured image bitmap will be injected
+         * */
         @JvmStatic
-        fun processResultDataForBitmap(context: Context, doWithBitmap: ((Bitmap) -> Unit)?) {
+        fun handleCapturedImageBitmap(context: Context, doWithBitmap: ((Bitmap) -> Unit)?) {
             revokeUriPermission(context)
-            ImageCompressionUtils
-                .getBitmapImageFromFile(context.applicationContext, mPhotoFile)?.apply {
-                    doWithBitmap?.let { it(this) }
-                }
+            ImageUtils.getBitmapFromFile(mPhotoFile)?.apply {
+                doWithBitmap?.let { it(this) }
+            }
+//            ImageCompressionUtils
+//                .getBitmapImageFromFile(context.applicationContext, mPhotoFile)?.apply {
+//                    doWithBitmap?.let { it(this) }
+//                }
         }
 
         private fun revokeUriPermission(context: Context) {
@@ -121,8 +152,31 @@ class CameraUtils {
     }
 }
 
+/**
+ * Extension function to launch Camera from "Activity"
+ *
+ * @param requestCode Unique request code that will be injected on "onActivityResult" method of caller Activity
+ * @return "true" on success
+ * */
+fun Activity.launchCameraForImage(requestCode: Int): Boolean =
+    CameraUtils.launchCameraForImage(this,requestCode)
+
+
+/**
+ * Extension function to launch Camera from "AppCompatActivity"
+ *
+ * @param requestCode Unique request code that will be injected on "onActivityResult" method of caller AppCompatActivity
+ * @return "true" on success
+ * */
 fun AppCompatActivity.launchCameraForImage(requestCode: Int): Boolean =
     CameraUtils.launchCameraForImage(this,requestCode)
 
+
+/**
+ * Extension function to launch Camera from "Fragment"
+ *
+ * @param requestCode Unique request code that will be injected on "onActivityResult" method of caller Fragment
+ * @return "true" on success
+ * */
 fun Fragment.launchCameraForImage(requestCode: Int): Boolean =
     CameraUtils.launchCameraForImage(this,requestCode)

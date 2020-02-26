@@ -24,10 +24,104 @@ dependencies {
 ```
 
 ## Features
-- Image [`capture`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/CameraUtils.kt) using camera api made very simple (`don't need User permission`).
+- Image [`capture`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/CameraUtils.kt) using camera api made very simple (`don't need Camera usage permission`).
 - Remote [`image downloading and display`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/ImageUtils.kt) made very simple.
 - Provides both synchronous(`blocking`) and asynchronous (`Coroutine suspend`/`Rx-java Observable`) options for image downloading.
 - And [`utility methods`](https://github.com/dasBikash84/android-image-utils/blob/master/android_image_utils/src/main/java/com/dasbikash/android_image_utils/Extensions.kt) for general image related operations.
+
+## Usage example
+
+### Capturing Image
+
+##### Step: 1
+Add provider tag inside your app manifest file as shown below:
+```
+<manifest  <!--...--> >
+
+    <application <!--......-->>
+        <!--.....-->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/files" />
+        </provider>
+        <!--..........-->
+    </application>
+
+</manifest>
+```
+##### Step: 2
+Add file path info for saving image inside your app module's `src/main/res/xml/files.xml` file as shown below:
+```
+    <paths>
+        <!--......-->
+        <files-path name="captured_image_dir" path="."/>
+    </paths>
+```
+
+##### Step: 3
+Launch Camera from Activity/Fragment
+```
+    // From activity
+    launchCameraForImage(this, REQUEST_TAKE_PHOTO) //REQUEST_TAKE_PHOTO is a unique Integer constant
+    
+            // Or
+            
+    //From Fragment
+    launchCameraForImage(this, REQUEST_TAKE_PHOTO) 
+    
+            // Or
+    
+    // From inside of activity/fragment using kotlin extension
+    launchCameraForImage(REQUEST_TAKE_PHOTO)
+```
+
+##### Step: 4
+Capture image using camera.
+
+##### Step: 5
+Retrieve captured image:
+
+```
+    // inside launcher Activity/Fragment class to retrieve captured image file 
+    
+     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == Activity.RESULT_OK) {
+            when (requestCode) {
+                REQUEST_TAKE_PHOTO -> {
+                    CameraUtils.handleCapturedImageFile(
+                        context,
+                        { doWithCapturedImage(it) })
+                    //where processImportedImage has signature like "fun doWithCapturedImage(file:File)"
+                } 
+                //.............
+            }
+        }
+    
+                                    // Or
+        
+    // inside launcher Activity/Fragment class to retrieve captured image bitmap 
+    
+     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == Activity.RESULT_OK) {
+            when (requestCode) {
+                REQUEST_TAKE_PHOTO -> {
+                    CameraUtils.handleCapturedImageBitmap(
+                        context,
+                        { doWithCapturedImageBitmap(it) })
+                    // where processImportedImage has signature like "fun doWithCapturedImageBitmap(bitmap:Bitmap)"
+                }
+                //.............
+            }
+        }
+```
+---
 
 License
 --------
